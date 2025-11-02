@@ -1,186 +1,160 @@
+
 #include <iostream>
 #include <unordered_map>
 #include <vector>
-#include <string>
 #include <queue>
-#include <deque>
-#include <sstream>
-#include <cmath>
+#include <climits>
+#include <string>
+#include <algorithm>
 using namespace std;
 
-class Pair {
+// Class representing the Delhi Metro Map as a weighted graph
+class MetroMap {
 public:
-    string vname;
-    string path;
-    int cost;
-    Pair(string vname, string path, int cost)
-        : vname(vname), path(path), cost(cost) {}
-};
+    unordered_map<string, vector<pair<string, int>>> adj; // adjacency list
 
-class myComparator {
-public:
-    bool operator()(Pair a, Pair b) { return a.cost > b.cost; }
-};
-
-class Graph {
-public:
-    unordered_map<string, unordered_map<string, int>> vtces;
-
-    void addVertex(string name) {
-        if (!vtces.count(name))
-            vtces[name] = unordered_map<string, int>();
+    // Add a connection between two stations
+    void addConnection(string u, string v, int dist) {
+        adj[u].push_back({v, dist});
+        adj[v].push_back({u, dist});
     }
 
-    void addEdge(string v1, string v2, int value) {
-        addVertex(v1);
-        addVertex(v2);
-        vtces[v1][v2] = value;
-        vtces[v2][v1] = value;
+    // Display all stations
+    void displayStations() {
+        cout << "\nAvailable Stations:\n";
+        for (auto &p : adj)
+            cout << "• " << p.first << endl;
     }
 
-    void display_Map() {
-        cout << "\nDelhi Metro Map:\n";
-        for (auto &v : vtces) {
-            cout << v.first << " -> ";
-            for (auto &nbr : v.second)
-                cout << nbr.first << "(" << nbr.second << " km)  ";
-            cout << "\n";
+    // Display all connections (Metro Map)
+    void displayMap() {
+        cout << "\n======== METRO MAP (Station -> [ConnectedStation, Distance]) ========\n";
+        for (auto &p : adj) {
+            cout << p.first << " -> ";
+            for (auto &nbr : p.second)
+                cout << "[" << nbr.first << ", " << nbr.second << "km] ";
+            cout << endl;
         }
     }
 
-    // Dijkstra’s algorithm – returns (distance, path)
-    pair<int, vector<string>> dijkstra(string src, string dst, bool timeMode = false) {
+    // Dijkstra's Algorithm using Min Heap (Priority Queue)
+    void shortestPath(string src, string dest) {
+        if (adj.find(src) == adj.end() || adj.find(dest) == adj.end()) {
+            cout << "\n Invalid Station Name!\n";
+            return;
+        }
+
         unordered_map<string, int> dist;
         unordered_map<string, string> parent;
-        unordered_map<string, bool> visited;
 
-        for (auto &v : vtces) dist[v.first] = INT_MAX;
+        for (auto &p : adj)
+            dist[p.first] = INT_MAX;
+
         dist[src] = 0;
 
-        priority_queue<Pair, vector<Pair>, myComparator> pq;
-        pq.push(Pair(src, src, 0));
+        // Min-heap {distance, node}
+        priority_queue<pair<int, string>, vector<pair<int, string>>, greater<pair<int, string>>> pq;
+        pq.push({0, src});
 
         while (!pq.empty()) {
-            Pair cur = pq.top();
+            auto [currDist, node] = pq.top();
             pq.pop();
 
-            if (visited[cur.vname]) continue;
-            visited[cur.vname] = true;
+            if (currDist > dist[node])
+                continue;
 
-            if (cur.vname == dst) break;
+            for (auto &nbr : adj[node]) {
+                string nextNode = nbr.first;
+                int edgeWeight = nbr.second;
 
-            for (auto &nbr : vtces[cur.vname]) {
-                if (!visited[nbr.first]) {
-                    int weight = nbr.second;
-                    if (timeMode)
-                        weight = 120 + 40 * weight; // base time + per km
-                    if (cur.cost + weight < dist[nbr.first]) {
-                        dist[nbr.first] = cur.cost + weight;
-                        parent[nbr.first] = cur.vname;
-                        pq.push(Pair(nbr.first, "", dist[nbr.first]));
-                    }
+                if (dist[node] + edgeWeight < dist[nextNode]) {
+                    dist[nextNode] = dist[node] + edgeWeight;
+                    parent[nextNode] = node;
+                    pq.push({dist[nextNode], nextNode});
                 }
             }
         }
 
-        // reconstruct path
-        vector<string> path;
-        string cur = dst;
-        if (parent.find(dst) == parent.end() && src != dst)
-            return {INT_MAX, {}};
-        while (cur != src) {
-            path.push_back(cur);
-            cur = parent[cur];
+        // If destination unreachable
+        if (dist[dest] == INT_MAX) {
+            cout << "\n⚠️ No path found between " << src << " and " << dest << ".\n";
+            return;
         }
-        path.push_back(src);
+
+        // Print shortest distance
+        cout << "\n🚇 Shortest Distance from " << src << " → " << dest << " = " << dist[dest] << " km\n";
+
+        // Reconstruct path
+        vector<string> path;
+        for (string at = dest; at != ""; at = parent[at]) {
+            path.push_back(at);
+            if (at == src)
+                break;
+        }
         reverse(path.begin(), path.end());
-        return {dist[dst], path};
+
+        cout << "🗺️  Path: ";
+        for (int i = 0; i < path.size(); ++i) {
+            cout << path[i];
+            if (i != path.size() - 1)
+                cout << " → ";
+        }
+        cout << endl;
     }
 };
 
-int main() {
-    Graph g;
+// Helper to build sample Delhi Metro Map
+MetroMap buildDelhiMetro() {
+    MetroMap m;
 
-    // Sample stations (you can add more)
-    g.addEdge("Kashmere Gate", "Civil Lines", 2);
-    g.addEdge("Civil Lines", "Vidhan Sabha", 1);
-    g.addEdge("Vidhan Sabha", "Vishwavidyalaya", 2);
-    g.addEdge("Vishwavidyalaya", "GTB Nagar", 2);
-    g.addEdge("GTB Nagar", "Model Town", 1);
-    g.addEdge("Model Town", "Azadpur", 2);
-    g.addEdge("Azadpur", "Adarsh Nagar", 2);
-    g.addEdge("Adarsh Nagar", "Jahangirpuri", 2);
-    g.addEdge("Jahangirpuri", "Haiderpur Badli Mor", 2);
+    m.addConnection("RajivChowk", "MandiHouse", 2);
+    m.addConnection("MandiHouse", "CentralSecretariat", 3);
+    m.addConnection("CentralSecretariat", "AIIMS", 5);
+    m.addConnection("AIIMS", "GreenPark", 2);
+    m.addConnection("GreenPark", "HauzKhas", 3);
+    m.addConnection("RajivChowk", "KashmereGate", 5);
+    m.addConnection("KashmereGate", "CivilLines", 2);
+    m.addConnection("CivilLines", "RedFort", 3);
+    m.addConnection("RedFort", "ChandniChowk", 1);
+    m.addConnection("RajivChowk", "ChandniChowk", 4);
+
+    return m;
+}
+
+// Main Program
+int main() {
+    MetroMap delhiMetro = buildDelhiMetro();
+    int choice;
 
     while (true) {
-        cout << "\n========== DELHI METRO SYSTEM ==========\n";
-        cout << "1. List all stations\n";
-        cout << "2. Show the metro map\n";
-        cout << "3. Get shortest distance\n";
-        cout << "4. Get shortest time\n";
-        cout << "5. Exit\n";
+        cout << "\n=============================\n";
+        cout << "       DELHI METRO MAP     \n";
+        cout << "=============================\n";
+        cout << "1. Display All Stations\n";
+        cout << "2. Display Metro Map\n";
+        cout << "3. Find Shortest Distance & Path\n";
+        cout << "4. Exit\n";
         cout << "Enter your choice: ";
-
-        int choice;
         cin >> choice;
-        if (choice == 5) break;
 
-        vector<string> stationNames;
-        for (auto &v : g.vtces) stationNames.push_back(v.first);
-
-        if (choice == 1) {
-            cout << "\nAll Stations:\n";
-            for (int i = 0; i < (int)stationNames.size(); ++i)
-                cout << i + 1 << ". " << stationNames[i] << "\n";
-        }
-
-        else if (choice == 2) {
-            g.display_Map();
-        }
-
-        else if (choice == 3 || choice == 4) {
-            cout << "\nSelect source and destination:\n";
-            for (int i = 0; i < (int)stationNames.size(); ++i)
-                cout << i + 1 << ". " << stationNames[i] << "\n";
-
-            int srcIndex, dstIndex;
-            cout << "Enter source index: ";
-            cin >> srcIndex;
-            cout << "Enter destination index: ";
-            cin >> dstIndex;
-
-            if (srcIndex < 1 || dstIndex < 1 ||
-                srcIndex > (int)stationNames.size() || dstIndex > (int)stationNames.size()) {
-                cout << "Invalid selection.\n";
-                continue;
-            }
-
-            string src = stationNames[srcIndex - 1];
-            string dst = stationNames[dstIndex - 1];
-
-            auto res = g.dijkstra(src, dst, choice == 4);
-
-            if (res.first == INT_MAX) {
-                cout << "No path exists between " << src << " and " << dst << ".\n";
-            } else {
-                cout << "\nPath: ";
-                for (size_t i = 0; i < res.second.size(); ++i) {
-                    cout << res.second[i];
-                    if (i != res.second.size() - 1) cout << " -> ";
-                }
-                cout << "\n";
-                if (choice == 3)
-                    cout << "Shortest Distance: " << res.first << " km\n";
-                else
-                    cout << "Shortest Time: " << ((res.first + 59) / 60) << " minutes\n";
-            }
-        }
-
-        else {
-            cout << "Invalid choice.\n";
+        if (choice == 1)
+            delhiMetro.displayStations();
+        else if (choice == 2)
+            delhiMetro.displayMap();
+        else if (choice == 3) {
+            string src, dest;
+            cout << "\nEnter Source Station: ";
+            cin >> src;
+            cout << "Enter Destination Station: ";
+            cin >> dest;
+            delhiMetro.shortestPath(src, dest);
+        } else if (choice == 4) {
+            cout << "\n Thank you for using Delhi Metro Navigator!\n";
+            break;
+        } else {
+            cout << "\n Invalid Choice! Try again.\n";
         }
     }
 
-    cout << "Thank you for using Delhi Metro System!\n";
     return 0;
 }
