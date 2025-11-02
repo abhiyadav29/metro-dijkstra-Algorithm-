@@ -1,434 +1,186 @@
-#include <bits/stdc++.h>
+#include <iostream>
+#include <unordered_map>
+#include <vector>
+#include <string>
+#include <queue>
+#include <deque>
+#include <sstream>
+#include <cmath>
 using namespace std;
 
-class Graph_M {
+class Pair {
 public:
-    class Vertex {
-    public:
-        unordered_map<string, int> nbrs;
-    };
+    string vname;
+    string path;
+    int cost;
+    Pair(string vname, string path, int cost)
+        : vname(vname), path(path), cost(cost) {}
+};
 
-    unordered_map<string, Vertex> vtces;
+class myComparator {
+public:
+    bool operator()(Pair a, Pair b) { return a.cost > b.cost; }
+};
 
-    int numVertex() {
-        return vtces.size();
+class Graph {
+public:
+    unordered_map<string, unordered_map<string, int>> vtces;
+
+    void addVertex(string name) {
+        if (!vtces.count(name))
+            vtces[name] = unordered_map<string, int>();
     }
 
-    bool containsVertex(const string &vname) {
-        return vtces.find(vname) != vtces.end();
-    }
-
-    void addVertex(const string &vname) {
-        Vertex vtx;
-        vtces[vname] = vtx;
-    }
-
-    void removeVertex(const string &vname) {
-        Vertex &vtx = vtces[vname];
-        vector<string> keys;
-        for (auto &nbr : vtx.nbrs) {
-            keys.push_back(nbr.first);
-        }
-
-        for (auto &key : keys) {
-            Vertex &nbrVtx = vtces[key];
-            nbrVtx.nbrs.erase(vname);
-        }
-
-        vtces.erase(vname);
-    }
-
-    int numEdges() {
-        int count = 0;
-        for (auto &vtx : vtces) {
-            count += vtx.second.nbrs.size();
-        }
-        return count / 2;
-    }
-
-    bool containsEdge(const string &vname1, const string &vname2) {
-        if (!containsVertex(vname1) || !containsVertex(vname2)) {
-            return false;
-        }
-        return vtces[vname1].nbrs.find(vname2) != vtces[vname1].nbrs.end();
-    }
-
-    void addEdge(const string &vname1, const string &vname2, int value) {
-        if (!containsVertex(vname1) || !containsVertex(vname2)) {
-            return;
-        }
-        vtces[vname1].nbrs[vname2] = value;
-        vtces[vname2].nbrs[vname1] = value;
-    }
-
-    void removeEdge(const string &vname1, const string &vname2) {
-        if (!containsEdge(vname1, vname2)) {
-            return;
-        }
-        vtces[vname1].nbrs.erase(vname2);
-        vtces[vname2].nbrs.erase(vname1);
+    void addEdge(string v1, string v2, int value) {
+        addVertex(v1);
+        addVertex(v2);
+        vtces[v1][v2] = value;
+        vtces[v2][v1] = value;
     }
 
     void display_Map() {
-        cout << "\t Delhi Metro Map" << endl;
-        cout << "\t------------------" << endl;
-        cout << "----------------------------------------------------\n" << endl;
-
-        for (auto &vtx : vtces) {
-            cout << vtx.first << " =>\n";
-            for (auto &nbr : vtx.second.nbrs) {
-                cout << "\t" << nbr.first << "\t" << nbr.second << "\n";
-            }
+        cout << "\nDelhi Metro Map:\n";
+        for (auto &v : vtces) {
+            cout << v.first << " -> ";
+            for (auto &nbr : v.second)
+                cout << nbr.first << "(" << nbr.second << " km)  ";
+            cout << "\n";
         }
-
-        cout << "\t------------------" << endl;
-        cout << "---------------------------------------------------\n" << endl;
     }
 
-    void display_Stations() {
-        cout << "\n***********************************************************************\n" << endl;
-        int i = 1;
-        for (auto &vtx : vtces) {
-            cout << i << ". " << vtx.first << endl;
-            i++;
-        }
-        cout << "\n***********************************************************************\n" << endl;
-    }
+    // Dijkstra’s algorithm – returns (distance, path)
+    pair<int, vector<string>> dijkstra(string src, string dst, bool timeMode = false) {
+        unordered_map<string, int> dist;
+        unordered_map<string, string> parent;
+        unordered_map<string, bool> visited;
 
-    bool hasPath(const string &vname1, const string &vname2, unordered_map<string, bool> &processed) {
-        if (containsEdge(vname1, vname2)) {
-            return true;
-        }
+        for (auto &v : vtces) dist[v.first] = INT_MAX;
+        dist[src] = 0;
 
-        processed[vname1] = true;
-        for (auto &nbr : vtces[vname1].nbrs) {
-            if (processed.find(nbr.first) == processed.end()) {
-                if (hasPath(nbr.first, vname2, processed)) {
-                    return true;
-                }
-            }
-        }
+        priority_queue<Pair, vector<Pair>, myComparator> pq;
+        pq.push(Pair(src, src, 0));
 
-        return false;
-    }
+        while (!pq.empty()) {
+            Pair cur = pq.top();
+            pq.pop();
 
-    class DijkstraPair {
-    public:
-        string vname;
-        string psf;
-        int cost;
+            if (visited[cur.vname]) continue;
+            visited[cur.vname] = true;
 
-        bool operator<(const DijkstraPair &other) const {
-            return cost > other.cost;
-        }
-    };
+            if (cur.vname == dst) break;
 
-    int dijkstra(const string &src, const string &des, bool nan) {
-        int val = 0;
-        vector<string> ans;
-        unordered_map<string, DijkstraPair> map;
-
-        priority_queue<DijkstraPair> heap;
-
-        for (auto &key : vtces) {
-            DijkstraPair np;
-            np.vname = key.first;
-            np.cost = INT_MAX;
-
-            if (key.first == src) {
-                np.cost = 0;
-                np.psf = key.first;
-            }
-
-            heap.push(np);
-            map[key.first] = np;
-        }
-
-        while (!heap.empty()) {
-            DijkstraPair rp = heap.top();
-            heap.pop();
-
-            if (rp.vname == des) {
-                val = rp.cost;
-                break;
-            }
-
-            map.erase(rp.vname);
-            ans.push_back(rp.vname);
-
-            for (auto &nbr : vtces[rp.vname].nbrs) {
-                if (map.find(nbr.first) != map.end()) {
-                    int oc = map[nbr.first].cost;
-                    int nc;
-                    if (nan) {
-                        nc = rp.cost + 120 + 40 * nbr.second;
-                    } else {
-                        nc = rp.cost + nbr.second;
-                    }
-
-                    if (nc < oc) {
-                        DijkstraPair gp = map[nbr.first];
-                        gp.psf = rp.psf + nbr.first;
-                        gp.cost = nc;
-
-                        map[nbr.first] = gp;
-                        heap.push(gp);
+            for (auto &nbr : vtces[cur.vname]) {
+                if (!visited[nbr.first]) {
+                    int weight = nbr.second;
+                    if (timeMode)
+                        weight = 120 + 40 * weight; // base time + per km
+                    if (cur.cost + weight < dist[nbr.first]) {
+                        dist[nbr.first] = cur.cost + weight;
+                        parent[nbr.first] = cur.vname;
+                        pq.push(Pair(nbr.first, "", dist[nbr.first]));
                     }
                 }
             }
         }
 
-        return val;
-    }
-
-    class Pair {
-    public:
-        string vname;
-        string psf;
-        int min_dis;
-        int min_time;
-    };
-
-    string Get_Minimum_Distance(const string &src, const string &dst) {
-        int min = INT_MAX;
-        string ans = "";
-        unordered_map<string, bool> processed;
-        deque<Pair> stack;
-
-        Pair sp;
-        sp.vname = src;
-        sp.psf = src + "  ";
-        sp.min_dis = 0;
-        sp.min_time = 0;
-
-        stack.push_front(sp);
-
-        while (!stack.empty()) {
-            Pair rp = stack.front();
-            stack.pop_front();
-
-            if (processed.find(rp.vname) != processed.end()) {
-                continue;
-            }
-
-            processed[rp.vname] = true;
-
-            if (rp.vname == dst) {
-                if (rp.min_dis < min) {
-                    ans = rp.psf;
-                    min = rp.min_dis;
-                }
-                continue;
-            }
-
-            for (auto &nbr : vtces[rp.vname].nbrs) {
-                if (processed.find(nbr.first) == processed.end()) {
-                    Pair np;
-                    np.vname = nbr.first;
-                    np.psf = rp.psf + nbr.first + "  ";
-                    np.min_dis = rp.min_dis + nbr.second;
-                    stack.push_front(np);
-                }
-            }
+        // reconstruct path
+        vector<string> path;
+        string cur = dst;
+        if (parent.find(dst) == parent.end() && src != dst)
+            return {INT_MAX, {}};
+        while (cur != src) {
+            path.push_back(cur);
+            cur = parent[cur];
         }
-
-        ans += to_string(min);
-        return ans;
-    }
-
-    string Get_Minimum_Time(const string &src, const string &dst) {
-        int min = INT_MAX;
-        string ans = "";
-        unordered_map<string, bool> processed;
-        deque<Pair> stack;
-
-        Pair sp;
-        sp.vname = src;
-        sp.psf = src + "  ";
-        sp.min_dis = 0;
-        sp.min_time = 0;
-
-        stack.push_front(sp);
-
-        while (!stack.empty()) {
-            Pair rp = stack.front();
-            stack.pop_front();
-
-            if (processed.find(rp.vname) != processed.end()) {
-                continue;
-            }
-
-            processed[rp.vname] = true;
-
-            if (rp.vname == dst) {
-                if (rp.min_time < min) {
-                    ans = rp.psf;
-                    min = rp.min_time;
-                }
-                continue;
-            }
-
-            for (auto &nbr : vtces[rp.vname].nbrs) {
-                if (processed.find(nbr.first) == processed.end()) {
-                    Pair np;
-                    np.vname = nbr.first;
-                    np.psf = rp.psf + nbr.first + "  ";
-                    np.min_time = rp.min_time + 120 + 40 * nbr.second;
-                    stack.push_front(np);
-                }
-            }
-        }
-
-        double minutes = ceil((double)min / 60);
-        ans += to_string(minutes);
-        return ans;
-    }
-
-    vector<string> get_Interchanges(const string &str) {
-        vector<string> arr;
-        stringstream ss(str);
-        string res;
-        vector<string> tokens;
-        while (getline(ss, res, ' ')) {
-            if (!res.empty()) {
-                tokens.push_back(res);
-            }
-        }
-
-        arr.push_back(tokens[0]);
-        int count = 0;
-        for (size_t i = 1; i < tokens.size() - 1; i++) {
-            size_t index = tokens[i].find('~');
-            string s = tokens[i].substr(index + 1);
-
-            if (s.length() == 2) {
-                string prev = tokens[i - 1].substr(tokens[i - 1].find('~') + 1);
-                string next = tokens[i + 1].substr(tokens[i + 1].find('~') + 1);
-
-                if (prev == next) {
-                    arr.push_back(tokens[i]);
-                } else {
-                    arr.push_back(tokens[i] + " ==> " + tokens[i + 1]);
-                    i++;
-                    count++;
-                }
-            } else {
-                arr.push_back(tokens[i]);
-            }
-        }
-
-        arr.push_back(to_string(count));
-        return arr;
+        path.push_back(src);
+        reverse(path.begin(), path.end());
+        return {dist[dst], path};
     }
 };
 
 int main() {
-    Graph_M g = Graph_M();
+    Graph g;
 
-    // Adding stations (vertices)
-    g.addVertex("Noida Sector 62");
-    g.addVertex("Botanical Garden");
-    g.addVertex("Yamuna Bank");
-    g.addVertex("Rajiv Chowk");
-    g.addVertex("Vaishali");
-    g.addVertex("Moti Nagar");
-    g.addVertex("Huda City Centre");
-    g.addVertex("Saket");
-    g.addVertex("AIIMS");
-    g.addVertex("Mundka");
-    g.addVertex("Bikaji Cama Place");
-    g.addVertex("Janak Puri West");
-    g.addVertex("Rajouri Garden");
-    g.addVertex("Kashmere Gate");
-    g.addVertex("Anand Vihar ISBT");
-    g.addVertex("Tis Hazari");
-    g.addVertex("Rithala");
+    // Sample stations (you can add more)
+    g.addEdge("Kashmere Gate", "Civil Lines", 2);
+    g.addEdge("Civil Lines", "Vidhan Sabha", 1);
+    g.addEdge("Vidhan Sabha", "Vishwavidyalaya", 2);
+    g.addEdge("Vishwavidyalaya", "GTB Nagar", 2);
+    g.addEdge("GTB Nagar", "Model Town", 1);
+    g.addEdge("Model Town", "Azadpur", 2);
+    g.addEdge("Azadpur", "Adarsh Nagar", 2);
+    g.addEdge("Adarsh Nagar", "Jahangirpuri", 2);
+    g.addEdge("Jahangirpuri", "Haiderpur Badli Mor", 2);
 
-    // Adding edges (distances)
-    g.addEdge("Noida Sector 62", "Botanical Garden", 8);
-    g.addEdge("Botanical Garden", "Yamuna Bank", 10);
-    g.addEdge("Yamuna Bank", "Rajiv Chowk", 6);
-    g.addEdge("Rajiv Chowk", "Vaishali", 7);
-    g.addEdge("Rajiv Chowk", "Moti Nagar", 11);
-    g.addEdge("Moti Nagar", "Huda City Centre", 12);
-    g.addEdge("Huda City Centre", "Saket", 10);
-    g.addEdge("Saket", "AIIMS", 8);
-    g.addEdge("AIIMS", "Bikaji Cama Place", 6);
-    g.addEdge("Bikaji Cama Place", "Mundka", 13);
-    g.addEdge("Mundka", "Janak Puri West", 8);
-    g.addEdge("Janak Puri West", "Rajouri Garden", 6);
-    g.addEdge("Rajouri Garden", "Kashmere Gate", 9);
-    g.addEdge("Kashmere Gate", "Anand Vihar ISBT", 7);
-    g.addEdge("Anand Vihar ISBT", "Tis Hazari", 10);
-    g.addEdge("Tis Hazari", "Rithala", 9);
-
-    // User Interface
     while (true) {
-        cout << "Menu:\n";
+        cout << "\n========== DELHI METRO SYSTEM ==========\n";
         cout << "1. List all stations\n";
         cout << "2. Show the metro map\n";
-        cout << "3. Get shortest distance between two stations\n";
-        cout << "4. Get shortest time between two stations\n";
-        cout << "5. Get shortest path (distance-wise)\n";
-        cout << "6. Get shortest path (time-wise)\n";
-        cout << "7. Exit\n";
+        cout << "3. Get shortest distance\n";
+        cout << "4. Get shortest time\n";
+        cout << "5. Exit\n";
         cout << "Enter your choice: ";
+
         int choice;
         cin >> choice;
+        if (choice == 5) break;
 
-        switch (choice) {
-        case 1:
-            g.display_Stations();
-            break;
-        case 2:
+        vector<string> stationNames;
+        for (auto &v : g.vtces) stationNames.push_back(v.first);
+
+        if (choice == 1) {
+            cout << "\nAll Stations:\n";
+            for (int i = 0; i < (int)stationNames.size(); ++i)
+                cout << i + 1 << ". " << stationNames[i] << "\n";
+        }
+
+        else if (choice == 2) {
             g.display_Map();
-            break;
-        case 3: {
-            string src, dst;
-            cout << "Enter source station: ";
-            cin >> src;
-            cout << "Enter destination station: ";
-            cin >> dst;
-            int dist = g.dijkstra(src, dst, false);
-            cout << "Shortest distance: " << dist << " km\n";
-            break;
         }
-        case 4: {
-            string src, dst;
-            cout << "Enter source station: ";
-            cin >> src;
-            cout << "Enter destination station: ";
-            cin >> dst;
-            int time = g.dijkstra(src, dst, true);
-            cout << "Shortest time: " << ceil((double)time / 60) << " minutes\n";
-            break;
+
+        else if (choice == 3 || choice == 4) {
+            cout << "\nSelect source and destination:\n";
+            for (int i = 0; i < (int)stationNames.size(); ++i)
+                cout << i + 1 << ". " << stationNames[i] << "\n";
+
+            int srcIndex, dstIndex;
+            cout << "Enter source index: ";
+            cin >> srcIndex;
+            cout << "Enter destination index: ";
+            cin >> dstIndex;
+
+            if (srcIndex < 1 || dstIndex < 1 ||
+                srcIndex > (int)stationNames.size() || dstIndex > (int)stationNames.size()) {
+                cout << "Invalid selection.\n";
+                continue;
+            }
+
+            string src = stationNames[srcIndex - 1];
+            string dst = stationNames[dstIndex - 1];
+
+            auto res = g.dijkstra(src, dst, choice == 4);
+
+            if (res.first == INT_MAX) {
+                cout << "No path exists between " << src << " and " << dst << ".\n";
+            } else {
+                cout << "\nPath: ";
+                for (size_t i = 0; i < res.second.size(); ++i) {
+                    cout << res.second[i];
+                    if (i != res.second.size() - 1) cout << " -> ";
+                }
+                cout << "\n";
+                if (choice == 3)
+                    cout << "Shortest Distance: " << res.first << " km\n";
+                else
+                    cout << "Shortest Time: " << ((res.first + 59) / 60) << " minutes\n";
+            }
         }
-        case 5: {
-            string src, dst;
-            cout << "Enter source station: ";
-            cin >> src;
-            cout << "Enter destination station: ";
-            cin >> dst;
-            string result = g.Get_Minimum_Distance(src, dst);
-            cout << "Shortest path (distance-wise): " << result << "\n";
-            break;
-        }
-        case 6: {
-            string src, dst;
-            cout << "Enter source station: ";
-            cin >> src;
-            cout << "Enter destination station: ";
-            cin >> dst;
-            string result = g.Get_Minimum_Time(src, dst);
-            cout << "Shortest path (time-wise): " << result << "\n";
-            break;
-        }
-        case 7:
-            return 0;
-        default:
-            cout << "Invalid choice. Please try again.\n";
+
+        else {
+            cout << "Invalid choice.\n";
         }
     }
 
+    cout << "Thank you for using Delhi Metro System!\n";
     return 0;
 }
